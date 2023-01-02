@@ -1,0 +1,10 @@
+[
+  {
+    "uid": "ShellBot",
+    "append": true,
+    "watch": false,
+    "script": "server.js",
+    "sourceDir": "/home/ubuntu/shell-bot",
+    "workingDir": "/home/ubuntu/shell-bot"
+  }
+]

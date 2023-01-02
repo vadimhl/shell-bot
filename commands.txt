@@ -20,3 +20,7 @@ help - Get help
 file - View and edit small text files
 upload - Upload and overwrite raw files
 r - Alias for /run or /enter
+aicompletion - call openai.createCompletion
+setprompt - set prompt for aicompletion
+getprompt - show prompt for aicompletion
+image - openai.createImage

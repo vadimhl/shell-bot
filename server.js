@@ -11,6 +11,7 @@ var escapeHtml = require("escape-html");
 var utils = require("./lib/utils");
 var Command = require("./lib/command").Command;
 var Editor = require("./lib/editor").Editor;
+const https = require('https');
 
 var CONFIG_FILE = path.join(__dirname, "config.json");
 try {
@@ -29,6 +30,30 @@ var contexts = {};
 var defaultCwd = process.env.HOME || process.cwd();
 
 var fileUploads = {};
+
+const { Configuration, OpenAIApi } = require("openai");
+
+const configuration = new Configuration({
+  //apiKey: process.env.OPENAI_API_KEY,
+  apiKey: "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",
+});
+const openai = new OpenAIApi(configuration);
+
+const paramsAI = {
+  model: "text-davinci-003",
+  prompt: "The following is a conversation with an AI assistant."
+          + " The assistant is helpful, creative, clever, and very friendly.\n\n"
+          + "Human: Hello, who are you?\n"
+          + "AI: I am an AI created by OpenAI. How can I help you today?\n"
+          + "Human: I'd like to cancel my subscription.\n"
+          +" AI:",
+  temperature: 0.9,
+  //max_tokens: 150,
+  //top_p: 1,
+  //frequency_penalty: 0.0,
+  //presence_penalty: 0.6,
+  //stop: [" Human:", " AI:"],
+}
 
 bot.on("updateError", function (err) {
   console.error("Error when updating:", err);
@@ -117,6 +142,25 @@ bot.command("r", function (msg, reply, next) {
   msg.command = msg.context.command ? "enter" : "run";
   next();
 });
+bot.text(function (msg, reply, next) {
+  var args = msg.text;
+  if (!args)
+    return reply.html("Use /run &lt;command&gt; to execute something.");
+
+  if (msg.context.command) {
+    var command = msg.context.command;
+    return reply.text("A command is already running.");
+  }
+
+  if (msg.editor) msg.editor.detach();
+  msg.editor = null;
+
+  console.log("Chat «%s»: running command «%s»", msg.chat.name, args);
+  msg.context.command = new Command(reply, msg.context, args);
+  msg.context.command.on("exit", function() {
+    msg.context.command = null;
+  });
+});
 
 // Signal sending
 bot.command("cancel", "kill", function (msg, reply, next) {
@@ -194,6 +238,8 @@ bot.command("run", function (msg, reply, next) {
     msg.context.command = null;
   });
 });
+
+
 
 // Editor start
 bot.command("file", function (msg, reply, next) {
@@ -506,7 +552,65 @@ bot.command("help", function (msg, reply, next) {
 // FIXME: persistence
 // FIXME: shape messages so we don't hit limits, and react correctly when we do
 
+bot.command("aicompletion", async function (msg, reply, next) {
+  var args = msg.args();
+  try {
+    const response = await openai.createCompletion( paramsAI );
+    reply.html(response.data.choices[0].text);
+  } catch (error) {
+    if (error.response) {
+      reply.html("error.response.status: " + error.response.status
+                 +"\nerror.response.data: " + error.response.data);
+    } else {
+      reply.html("error.message" + error.message);
+    }
+  }
 
-bot.command(function (msg, reply, next) {
-  reply.reply(msg).text("Invalid command.");
+});
+
+bot.command("getprompt", function (msg, reply, next) {
+  reply.html('paramsAI.prompt: '+paramsAI.prompt);
+});
+
+bot.command("setprompt", function (msg, reply, next) {
+  paramsAI.prompt = msg.args();
+  reply.html('paramsAI.prompt: '+paramsAI.prompt);
+});
+
+
+bot.command("image", async function (msg, reply, next) {
+  const prompt = msg.args();
+  //console.log("2 test: " + args);
+  //const prompt = "Blonde girl on the coast of tropical islands, realistic style."
+  //const imageSize = size === 'small' ? '256x256' : size === 'medium' ? '512x512' : '1024x1024';
+  const imageSize = '256x256'
+
+  try {
+    const response = await openai.createImage({
+      prompt,
+      n: 1,
+      size: imageSize,
+    });
+    const imageUrl = response.data.data[0].url;
+    console.log(imageUrl);
+    https.get(imageUrl, (stream) => {
+      reply.photo(stream);
+    });
+
+  } catch (error) {
+    if (error.response) {
+      reply.html("error.response.status: " + error.response.status
+                 +"\nerror.response.data: " + error.response.data);
+    } else {
+      reply.html("error.message" + error.message);
+    }
+  }
+  //const imageUrl = "https://pikvik.com.ua/pikvik_logo.png"
+
+  //reply.html("It's a test with args: " + args);
+});
+
+bot.command("test", async function (msg, reply, next) {
+  var args = msg.args();
+  reply.html("It's a test with args: " + args);
 });
